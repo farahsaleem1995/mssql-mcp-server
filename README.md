@@ -4,6 +4,7 @@ A production-grade [Model Context Protocol](https://modelcontextprotocol.io/) se
 
 ## Features
 
+- **Multi-Instance Support** — Run multiple server instances (one per database) concurrently using isolated configurations and bash scripts
 - **Dual Transport** — Supports both legacy SSE (`GET /sse` + `POST /messages`) and modern Streamable HTTP (`POST /mcp`) transports
 - **Read-Only Safety** — Zod validation ensures only `SELECT` queries are executed; destructive keywords are blocked at the application layer
 - **Row Limit** — `execute_read` automatically enforces a `TOP 1000` row limit to prevent oversized responses
@@ -33,18 +34,7 @@ npm install
 cp .env.example .env
 ```
 
-Edit `.env` with your SQL Server credentials:
-
-```env
-DB_SERVER=localhost
-DB_PORT=1433
-DB_DATABASE=MyDatabase
-DB_USER=mcp_readonly
-DB_PASSWORD=YourSecurePassword
-DB_ENCRYPT=false
-DB_TRUST_SERVER_CERTIFICATE=true
-MCP_PORT=3001
-```
+Edit `.env` with your SQL Server credentials. By default, the server loads `.env` from the root directory.
 
 ### 3. Start the Server
 
@@ -65,6 +55,44 @@ curl http://localhost:3001/health
 
 # Connect with MCP Inspector
 npx @modelcontextprotocol/inspector http://localhost:3001/sse
+```
+
+## Running Multiple Instances
+
+You can run multiple MCP server instances (e.g., for different databases) concurrently.
+
+### 1. Create Instance Configs
+
+Create a `.env` file for each database in the `instances/` directory:
+
+```bash
+# Example
+cp instances/example.env instances/hr_database.env
+```
+
+Each instance **must** have a unique `MCP_PORT`.
+
+### 2. Manage Instances
+
+Use the provided bash scripts to manage all instances at once:
+
+```bash
+# Make scripts executable
+chmod +x start-all.sh stop-all.sh
+
+# Start all instances (loads all instances/*.env)
+./start-all.sh
+
+# Stop all instances
+./stop-all.sh
+```
+
+Logs for each instance are saved to `instances/<name>.log`.
+
+### 3. Manual Start
+You can also start a specific instance manually:
+```bash
+npx tsx src/index.ts --env-file instances/hr_database.env
 ```
 
 ## Connecting from ASP.NET Core
@@ -186,12 +214,15 @@ INSERT INTO YourTable (col) VALUES ('test');
 
 ```
 mssql-mcp-server/
+├── instances/            # Instance-specific .env files
 ├── src/
 │   ├── index.ts          # Express app + transport wiring
 │   ├── server.ts         # McpServer factory + tool registration
 │   ├── db.ts             # Singleton connection pool
 │   ├── tools.ts          # Tool definitions (list_tables, get_schema, execute_read)
 │   └── validation.ts     # Zod schemas + SQL safety refinements
+├── start-all.sh          # Batch start script
+├── stop-all.sh           # Batch stop script
 ├── .env.example
 ├── .gitignore
 ├── package.json
