@@ -1,4 +1,5 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import { resolve } from 'node:path';
 import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
@@ -6,6 +7,14 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { createServer } from './server.js';
 import { closePool } from './db.js';
+
+// ─── Load environment from CLI arg or default .env ─────────────────────────
+const envFileArg = process.argv.indexOf('--env-file');
+const envPath = envFileArg !== -1 && process.argv[envFileArg + 1]
+  ? resolve(process.argv[envFileArg + 1])
+  : undefined;
+
+dotenv.config({ path: envPath });
 
 const PORT = parseInt(process.env.MCP_PORT || '3001', 10);
 const app = express();
@@ -143,16 +152,22 @@ process.on('SIGTERM', shutdown);
 
 // ─── Start ──────────────────────────────────────────────────────────────────
 
+const DB_NAME = process.env.DB_DATABASE || 'unknown';
+const ENV_LABEL = envPath || '.env';
+
 app.listen(PORT, () => {
   console.log(`
-┌──────────────────────────────────────────────┐
-│  SQL Server MCP Server                       │
-│                                              │
-│  SSE Transport:        http://localhost:${PORT}/sse │
-│  Streamable HTTP:      http://localhost:${PORT}/mcp │
-│  Health:               http://localhost:${PORT}/health │
-│                                              │
-│  Ready to accept connections                 │
-└──────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│  SQL Server MCP Server                           │
+│                                                  │
+│  Database:    ${DB_NAME.padEnd(35)}│
+│  Env file:    ${ENV_LABEL.padEnd(35)}│
+│                                                  │
+│  SSE:         http://localhost:${PORT}/sse${' '.repeat(Math.max(0, 14 - String(PORT).length))}│
+│  Streamable:  http://localhost:${PORT}/mcp${' '.repeat(Math.max(0, 14 - String(PORT).length))}│
+│  Health:      http://localhost:${PORT}/health${' '.repeat(Math.max(0, 11 - String(PORT).length))}│
+│                                                  │
+│  Ready to accept connections                     │
+└──────────────────────────────────────────────────┘
   `);
 });
